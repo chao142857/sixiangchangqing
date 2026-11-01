@@ -1,0 +1,6 @@
+node_modules/
+dist/
+交付包/
+.DS_Store
+*.local
+test-results/

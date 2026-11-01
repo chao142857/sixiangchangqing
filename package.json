@@ -1,0 +1,29 @@
+{
+  "name": "thought-evergreen",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "materials": "node scripts/export-materials.mjs",
+    "check:content": "node scripts/verify-content.mjs",
+    "dev": "npm run materials && vite --host 0.0.0.0",
+    "build": "npm run materials && npm run check:content && tsc --noEmit && vite build && node scripts/build-offline.mjs",
+    "preview": "vite preview --host 0.0.0.0",
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "^0.180.0",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "7.3.6"
+  }
+}

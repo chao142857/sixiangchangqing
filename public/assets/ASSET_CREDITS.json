@@ -1,0 +1,21 @@
+{
+  "verifiedAt": "2026-10-29",
+  "historicalPhoto": {
+    "localSource": "src/assets/mao-1944-nara.jpg",
+    "title": "Mao Tse-Tung, leader of China's Communists, addresses some of his followers.",
+    "archiveId": "NARA 196235",
+    "collection": "Franklin D. Roosevelt Library Public Domain Photographs",
+    "photographer": "Unknown / not provided",
+    "archiveDate": "1944-12-06",
+    "dateNote": "档案所标日期；展览只标1944，不将其当作寻乌调查影像。",
+    "filePage": "https://commons.wikimedia.org/wiki/File:Mao_Tse-Tung,_leader_of_China%27s_Communists,_addresses_some_of_his_followers._-_NARA_-_196235.jpg",
+    "archivePage": "https://catalog.archives.gov/id/196235",
+    "license": "Public domain; Commons PD-USGov and Public Domain Mark 1.0; uploaded by US National Archives bot as part of NARA cooperation project",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "verification": "已读取Commons档案导入元数据和授权段；NARA目录本次检索工具未能读取。",
+    "modification": "使用960像素缩略版本；不修复、生成或伪造历史人物、场景和字迹。",
+    "bytes": 157565,
+    "sha256": "0fdc1590ab444602de7997496eeb95cc790a19acd9c86b4224c8848691721a69"
+  },
+  "otherAssets": "历史建筑、家具、书桌道具、纹理与当代场景由本项目程序化制作；建筑为基于参考资料的艺术化重建，非测绘级历史复原。文献为原典标题及短句的现代排印展示，非原稿扫描。"
+}
