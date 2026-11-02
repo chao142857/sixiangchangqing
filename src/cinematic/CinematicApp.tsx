@@ -4,6 +4,8 @@ import ArchivePanel from './ArchivePanel';
 import DocumentReader from './DocumentReader';
 import Finale, { type FinaleHandle } from './Finale';
 import { atlas, scenes, type Scene, type ScenePhase } from './scenes';
+import { chapterImages, experienceImages, finaleImages, roomImages } from './assets';
+import { imagesReady, prepareImages } from './imageLoader';
 
 type AutoState = 'off' | 'playing' | 'paused';
 
@@ -50,12 +52,41 @@ export default function CinematicApp() {
   const [manualReading, setManualReading] = useState(false);
   const [finaleState, setFinaleState] = useState<'playing' | 'paused' | 'finished'>('playing');
   const [finaleKey, setFinaleKey] = useState(0);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [assetError, setAssetError] = useState(false);
+  const assetRequest = useRef(0);
   const scene = scenes[index];
   sceneRef.current = scene;
+
+  useEffect(() => {
+    let mounted = true;
+    void prepareImages(roomImages(0)).then(() => {
+      if (!mounted) return;
+      setSceneReady(true);
+      // Warm later chapters without competing with the first visible composition.
+      void prepareImages(experienceImages, 'low').catch(() => {});
+    }, () => { if (mounted) setAssetError(true); });
+    return () => { mounted = false; assetRequest.current++; };
+  }, []);
+
+  const whenImagesReady = useCallback((urls: readonly string[], perform: () => void) => {
+    const request = ++assetRequest.current;
+    setAssetError(false);
+    if (imagesReady(urls)) { setPreparing(false); perform(); return; }
+    setPreparing(true);
+    void prepareImages(urls).then(() => {
+      if (request !== assetRequest.current) return;
+      setPreparing(false); setSceneReady(true); perform();
+    }, () => {
+      if (request === assetRequest.current) { setPreparing(false); setAssetError(true); }
+    });
+  }, []);
 
   const setPhase = useCallback((next: ScenePhase) => { phaseRef.current = next; setPhaseState(next); }, []);
   const setAmbientPaused = useCallback((paused: boolean) => { pausedRef.current = paused; ambient.current.forEach(tween => paused ? tween.pause() : tween.resume()); }, []);
   const stopAuto = useCallback(() => {
+    assetRequest.current++; setPreparing(false);
     auto.current?.kill(); auto.current = null; action.current?.resume(); setAmbientPaused(false);
     setAutoState('off'); setTour(false); tourRef.current = false; setInterlude(null);
     setManualReading(false); resumeAfterReading.current = false; resumeOnRoom.current = false;
@@ -181,11 +212,13 @@ export default function CinematicApp() {
   }, [goPresent, resetVisuals, setPhase, stopAuto]);
 
   const enterFinale = useCallback(() => {
-    setChaptersOpen(false); setFinaleState(pausedRef.current ? 'paused' : 'playing');
-    setFinaleKey(value => value + 1); setInterlude('outro');
-  }, []);
+    whenImagesReady(finaleImages, () => {
+      setChaptersOpen(false); setFinaleState(pausedRef.current ? 'paused' : 'playing');
+      setFinaleKey(value => value + 1); setInterlude('outro');
+    });
+  }, [whenImagesReady]);
 
-  const startTour = useCallback(() => {
+  const playTour = useCallback(() => {
     if (phaseRef.current === 'chapter-changing') return;
     auto.current?.kill(); action.current?.kill(); action.current = null;
     resetVisuals(); gsap.set(chapterCurtain.current, { scaleX: 0, autoAlpha: 0 });
@@ -205,6 +238,7 @@ export default function CinematicApp() {
       .addLabel('结束', 138).call(() => {}, [], '结束');
     auto.current = timeline;
   }, [changeChapter, closeDocument, enterFinale, goPresent, openDocumentAction, resetVisuals, setAmbientPaused, setPhase]);
+  const startTour = () => whenImagesReady(experienceImages, playTour);
 
   const takeOverReading = useCallback(() => {
     if (!auto.current || !tourRef.current) return;
@@ -240,6 +274,7 @@ export default function CinematicApp() {
     }
   };
   const showArchive = () => {
+    assetRequest.current++; setPreparing(false);
     if (tourRef.current) { auto.current?.pause(); action.current?.pause(); setAutoState('paused'); setAmbientPaused(true); }
     setChaptersOpen(false); setArchive(true);
   };
@@ -314,8 +349,9 @@ export default function CinematicApp() {
 
   const isReading = ['opening', 'reading', 'closing'].includes(phase);
   const isBusy = ['opening', 'closing', 'transitioning', 'chapter-changing'].includes(phase);
+  const currentRoomReady = sceneReady && imagesReady(roomImages(index));
   const [x, y, w, h] = scene.bounds;
-  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-reading={manualReading ? 'manual' : 'normal'} data-mode={tour ? 'guided' : 'explore'} data-finale={interlude === 'outro' ? finaleState : 'off'} className={`experience exploration ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' || finaleState === 'paused' && interlude === 'outro' ? 'is-paused' : ''}`} ref={root}>
+  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-reading={manualReading ? 'manual' : 'normal'} data-mode={tour ? 'guided' : 'explore'} data-finale={interlude === 'outro' ? finaleState : 'off'} data-assets={currentRoomReady ? 'ready' : 'loading'} aria-busy={!currentRoomReady || preparing} className={`experience exploration ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' || finaleState === 'paused' && interlude === 'outro' ? 'is-paused' : ''}`} ref={root}>
     <div className="stage">
       <div className="camera" ref={camera}>
         <ParallaxScene scene={scene} />
@@ -324,7 +360,7 @@ export default function CinematicApp() {
           <div className="contact-shadow" ref={contactShadow} style={scene.shadow ? { backgroundImage: `url("${scene.shadow}")` } : undefined} />
           <div className="scene-prop" ref={prop} style={{ left: `${x / 16.72}%`, top: `${y / 9.41}%`, width: `${w / 16.72}%`, height: `${h / 9.41}%` }}>
             <img src={scene.prop} alt="" draggable="false" />
-            {phase === 'room' && !interlude && <button className="prop-hotspot" aria-label={`打开${scene.exhibit.title}`} onClick={() => { takeOverReading(); openDocumentAction(); }}><span>查看文献</span></button>}
+            {phase === 'room' && !interlude && <button className="prop-hotspot" aria-label={`打开${scene.exhibit.title}`} onClick={() => whenImagesReady(chapterImages(index), () => { takeOverReading(); openDocumentAction(); })}><span>查看文献</span></button>}
           </div>
         </div>
       </div>
@@ -357,13 +393,14 @@ export default function CinematicApp() {
     {interlude === 'outro' ? <footer className="finale-controls" aria-label="终章操作">
       {finaleState === 'finished' ? <><button onClick={replayFinale}>再次观看</button><button onClick={leaveFinale}>返回目录</button></> : <><button onClick={pauseFinale}>{finaleState === 'paused' ? '继续' : '暂停'}</button><button onClick={skipFinale}>跳过</button><button onClick={leaveFinale}>退出</button></>}
     </footer> : <footer className="explore-controls ui" aria-label="场景操作">
-      <div className="chapter-picker"><button aria-expanded={chaptersOpen} onClick={() => setChaptersOpen(!chaptersOpen)}>目录</button>{chaptersOpen && <nav className="chapter-menu" aria-label="目录">{scenes.map((item, i) => <button key={item.id} onClick={() => exploreChapter(i)}>{item.chapter} · {['寻乌调查', '延安', '遵义会议'][i]}</button>)}<button onClick={startTour}>自动导览</button><button onClick={showArchive}>参考文献与制作说明</button></nav>}</div>
+      <div className="chapter-picker"><button aria-expanded={chaptersOpen} onClick={() => setChaptersOpen(!chaptersOpen)}>目录</button>{chaptersOpen && <nav className="chapter-menu" aria-label="目录">{scenes.map((item, i) => <button key={item.id} onClick={() => whenImagesReady(chapterImages(i), () => exploreChapter(i))}>{item.chapter} · {['寻乌调查', '延安', '遵义会议'][i]}</button>)}<button onClick={startTour}>自动导览</button><button onClick={showArchive}>参考文献与制作说明</button></nav>}</div>
       {autoState === 'off' ? <>
-        {!isReading && <><button disabled={isBusy || (index === 0 && phase === 'room')} onClick={() => { setInterlude(null); if (phase === 'present') returnRoom(); else if (index > 0) changeChapter(index - 1, false, true); }}>上一场景</button><button disabled={isBusy || (index === 2 && phase === 'present')} onClick={() => { setInterlude(null); if (phase === 'room') goPresent(); else if (index < 2) changeChapter(index + 1); }}>下一场景</button></>}
+        {!isReading && <><button disabled={isBusy || (index === 0 && phase === 'room')} onClick={() => whenImagesReady(chapterImages(phase === 'present' ? index : Math.max(0, index - 1)), () => { setInterlude(null); if (phase === 'present') returnRoom(); else if (index > 0) changeChapter(index - 1, false, true); })}>上一场景</button><button disabled={isBusy || (index === 2 && phase === 'present')} onClick={() => whenImagesReady(chapterImages(phase === 'room' ? index : Math.min(2, index + 1)), () => { setInterlude(null); if (phase === 'room') goPresent(); else if (index < 2) changeChapter(index + 1); })}>下一场景</button></>}
         {index === 2 && phase === 'present' && <button onClick={enterFinale}>进入终章</button>}
         <button onClick={startTour} disabled={phase === 'chapter-changing'}>自动导览</button>
       </> : <><button onClick={pause}>{autoState === 'playing' ? '暂停导览' : '继续导览'}</button><button onClick={skipChapter}>跳过本章</button><button onClick={stopAuto}>退出导览</button></>}
     </footer>}
+    {!archive && (!currentRoomReady || preparing || assetError) && <p className="asset-status" role="status">{assetError ? '画面加载失败，请重试。' : '正在准备画面…'}</p>}
     {hidden && <button className="restore-ui" onClick={() => setHidden(false)}>显示界面 <kbd>H</kbd></button>}
     {archive && <ArchivePanel scene={scene} close={() => setArchive(false)} />}
   </main>;

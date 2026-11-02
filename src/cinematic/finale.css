@@ -1,4 +1,5 @@
 .finale{position:absolute;inset:0;z-index:20;overflow:hidden;background:transparent;pointer-events:none;color:#f5e8cd}
+.finale-shot,.finale-memory,.finale-hero,.finale-foreground,.finale-satellite,.finale-paper,.finale-word,.finale-final-title>*{opacity:0;visibility:hidden}
 .finale-shot,.finale-hero,.finale-satellite,.finale-paper{position:absolute;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat;will-change:transform,opacity,clip-path}
 .finale-shot::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#160c08a8,transparent 48%),linear-gradient(0deg,#120b08a8,transparent 33%)}
 .finale-word{position:absolute;z-index:2;left:7%;bottom:16%;font-size:clamp(30px,3.3vw,62px);letter-spacing:.16em;color:#f8e6c7;text-shadow:0 4px 22px #1a0905}

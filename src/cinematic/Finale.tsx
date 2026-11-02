@@ -1,19 +1,9 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { gsap } from 'gsap';
-import { scenes } from './scenes';
+import { finaleArt, finaleFrames as frames } from './assets';
 import './finale.css';
 
 export interface FinaleHandle { pause: () => void; resume: () => void; finish: () => void }
-
-const path = (chapter: string, file: string) => `${import.meta.env.BASE_URL}assets/scenes/${chapter}/${file}`;
-const frames = [
-  { id: 'xunwu', image: path('xunwu', 'workroom.png'), text: '实事求是' },
-  { id: 'yanan', image: path('yanan', 'room-clean.png'), text: '群众路线' },
-  { id: 'zunyi', image: path('zunyi', 'room-clean.png'), text: '独立自主' },
-  { id: 'village', image: scenes[0].present, text: '浙江 · 千万工程' },
-  { id: 'pujiang', image: scenes[1].present, text: '浙江 · 浦江经验' },
-  { id: 'beidou', image: scenes[2].present, text: '北斗 · 星海' },
-] as const;
 
 /** One independent 23.5s direction timeline; all assets remain the existing local CGs. */
 const Finale = forwardRef<FinaleHandle, { paused: boolean; onComplete: () => void }>(function Finale({ paused, onComplete }, ref) {
@@ -78,14 +68,14 @@ const Finale = forwardRef<FinaleHandle, { paused: boolean; onComplete: () => voi
   useLayoutEffect(() => { timeline.current?.paused(paused); }, [paused]);
   return <section className="finale" ref={root} data-cue="start" aria-label="薪火相传 · 思想常青">
     {frames.map(frame => <div key={frame.id} className={`finale-shot shot-${frame.id}`} style={{ backgroundImage: `url("${frame.image}")` }}>
-      {frame.id === 'beidou' && <div className="finale-satellite" style={{ backgroundImage: `url("${scenes[2].presentOverlay}")` }} />}
+      {frame.id === 'beidou' && <div className="finale-satellite" style={{ backgroundImage: `url("${finaleArt.satellite}")` }} />}
       <div className="finale-word">{frame.text}</div>
     </div>)}
     <div className="finale-memory memory-xunwu" style={{ backgroundImage: `url("${frames[0].image}")` }} />
     <div className="finale-memory memory-yanan" style={{ backgroundImage: `url("${frames[1].image}")` }} />
-    <div className="finale-paper" style={{ backgroundImage: `url("${path('xunwu', 'atlas-cutout.png')}")` }} />
-    <div className="finale-hero" style={{ backgroundImage: `url("${path('finale', 'archive-hero.png')}")` }} />
-    <div className="finale-foreground" style={{ backgroundImage: `url("${path('xunwu', 'book-closed.png')}")` }} />
+    <div className="finale-paper" style={{ backgroundImage: `url("${finaleArt.paper}")` }} />
+    <div className="finale-hero" style={{ backgroundImage: `url("${finaleArt.hero}")` }} />
+    <div className="finale-foreground" style={{ backgroundImage: `url("${finaleArt.foreground}")` }} />
     <div className="finale-final-title">
       <h2 className="finale-title">思想常青</h2>
       <p className="finale-subtitle">毛泽东思想活的灵魂</p>
