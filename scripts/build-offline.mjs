@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 const { build } = await import('vite');
 const result = await build({
   configFile: false,
+  // The cinematic scene's public assets must resolve beside the generated HTML under file://.
+  base: './',
   define: { 'process.env.NODE_ENV': '"production"' },
   build: {
     write: false,

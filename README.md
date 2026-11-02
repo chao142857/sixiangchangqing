@@ -1,5 +1,11 @@
 # 思想常青
 
+## 电影式叙事（当前入口）
+
+当前入口包括寻乌→千万工程、延安→浦江经验、遵义→北斗三个章节。`npm run dev -- --port 5173` 后访问 `http://localhost:5173/`。点击桌面文献阅读，通过“章节”切换章节，“资料模式”查看原典、案例与来源；每章约42秒自动播放，可以暂停、继续或跳过。按 `H` 隐藏/恢复界面，`Esc` 收起文献或关闭资料。`npm run build` 构建，`npm run test:cinematic` 使用本机 Chrome 进行交互冒烟测试。
+
+新 CG 是生成式艺术重建，不是历史照片；图层和剩余资产见 `docs/ART_DIRECTION.md`，本轮测试、截图与录像见 `docs/ITERATION_REPORT.md`。离线版需要 `dist/离线阅读.html` 和其旁边的 `assets/` 文件夹。安全基线为本地分支 `safety/pre-cg-rebuild`，当前分支 `feature/xunwu-cinematic`；本轮开始前的文件快照位于 `backups/cinematic-before-art-iteration.tar.gz`。下方说明记录的是**重构前旧版**的功能与状态，其中三维、旧版阅读入口、时长和离线功能描述不适用于当前默认入口。
+
 毛泽东思想活的灵魂——跨越历史与现实的沉浸式数字展。同济大学毛概课程作品，采用五章历史与现实叙事、课堂导览、自由探索与降级阅读。
 
 ## 本地运行
