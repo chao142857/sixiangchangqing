@@ -8,7 +8,7 @@ try {
   const page = await browser.newPage();
   await page.clock.install();
   await page.goto(base, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: '▶ 全片导览' }).click();
+  await page.getByRole('button', { name: '▶ 播放' }).click();
   for (const [delta, chapter, phase] of [
     [12000, 'xunwu', 'opening'], [23000, 'xunwu', 'present'],
     [17000, 'yanan', 'reading'], [20000, 'yanan', 'present'],
@@ -20,6 +20,6 @@ try {
   }
   await page.clock.runFor(12000);
   assert(await page.locator('.interlude-outro').isVisible());
-  assert(await page.getByRole('button', { name: '返回章节' }).isVisible());
+  assert(await page.getByRole('button', { name: '▶ 播放' }).isVisible());
   console.log('PASS: virtual-clock timeline 124s, all three chapter/case pairs and ending');
 } finally { await browser.close(); }

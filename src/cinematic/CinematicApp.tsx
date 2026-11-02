@@ -44,6 +44,7 @@ export default function CinematicApp() {
   const [intro, setIntro] = useState(true);
   const [interlude, setInterlude] = useState<'intro' | 'outro' | null>(null);
   const [tour, setTour] = useState(false);
+  const [mode, setMode] = useState<'performance' | 'reference'>('performance');
   const scene = scenes[index];
   sceneRef.current = scene;
 
@@ -90,7 +91,7 @@ export default function CinematicApp() {
     setIntro(false); setPage(0); setPhase('opening'); action.current?.kill();
     gsap.set(paper.current, { clearProps: 'transform,opacity,visibility' });
     const documentKind = sceneRef.current.id;
-    action.current = gsap.timeline({ onComplete: () => setPhase('reading') })
+    const timeline = gsap.timeline({ onComplete: () => setPhase('reading') })
       .to(camera.current, { scale: 1.12, xPercent: -2, yPercent: -3, duration: 1.5, ease: 'power2.inOut' }, 0)
       .to(shade.current, { opacity: 0.66, duration: 1.25 }, 0.15)
       .to(contactShadow.current, { opacity: 0, duration: 0.8 }, 0.55)
@@ -100,8 +101,12 @@ export default function CinematicApp() {
       .call(() => { if (paper.current) gsap.set(paper.current, { ...bookPose(paper.current), autoAlpha: 0 }); }, [], 1.65)
       .to(paper.current, { autoAlpha: 1, duration: 0.35 }, 1.68)
       .to(prop.current, { autoAlpha: 0, duration: 0.35 }, 1.75)
-      .to(paper.current, { x: 0, y: 0, scaleX: 1, scaleY: 1, rotationX: 0, rotation: 0, duration: 1.05, ease: 'power2.inOut' }, 1.7)
-      .fromTo('.paper-content, .paper-controls', { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: 0.75, stagger: 0.1 }, 2.48);
+      .to(paper.current, { x: 0, y: 0, scaleX: 1, scaleY: 1, rotationX: 0, rotation: 0, duration: 1.05, ease: 'power2.inOut' }, 1.7);
+    if (documentKind === 'yanan') timeline.fromTo('.archive-extract', { autoAlpha: 0, yPercent: 14 }, { autoAlpha: 1, yPercent: 0, duration: 0.85, ease: 'power2.out' }, 1.9);
+    if (documentKind === 'zunyi') timeline
+      .fromTo('.unrolled-map', { autoAlpha: 0, scaleX: 0.08, transformOrigin: 'left center' }, { autoAlpha: 1, scaleX: 1, duration: 1.05, ease: 'power2.out' }, 1.7)
+      .fromTo('.unrolled-route path', { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 1.1, ease: 'power1.inOut' }, 2.15);
+    action.current = timeline.fromTo('.paper-content, .paper-controls', { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: 0.75, stagger: 0.1 }, 2.48);
   }, [bookPose, setPhase]);
 
   const closeDocument = useCallback(() => {
@@ -226,6 +231,22 @@ export default function CinematicApp() {
     setInterlude(null); setIntro(false); setChaptersOpen(false); setPhase('room');
     auto.current.seek(`chapter-${next}`, true);
   };
+  const skipChapter = () => {
+    if (!tourRef.current || !auto.current) {
+      if (indexRef.current < scenes.length - 1 && ['room', 'present'].includes(phaseRef.current)) changeChapter(indexRef.current + 1);
+      return;
+    }
+    if (indexRef.current < scenes.length - 1) { jumpChapter(indexRef.current + 1); return; }
+    action.current?.kill(); action.current = null; resetVisuals();
+    gsap.set(chapterCurtain.current, { scaleX: 0, autoAlpha: 0 });
+    gsap.set(modern.current, { opacity: 1, clipPath: 'none' });
+    setPhase('present'); setInterlude('outro'); setChaptersOpen(false);
+    auto.current.seek('终章', true);
+  };
+  const enterReference = () => {
+    if (action.current?.isActive() || action.current?.paused()) action.current.progress(1);
+    stopAuto(); setChaptersOpen(false); setMode('reference');
+  };
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -241,7 +262,7 @@ export default function CinematicApp() {
   const isReading = ['opening', 'reading', 'closing'].includes(phase);
   const isBusy = ['opening', 'closing', 'transitioning', 'chapter-changing'].includes(phase);
   const [x, y, w, h] = scene.bounds;
-  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} className={`experience ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' || actionPaused ? 'is-paused' : ''}`} ref={root}>
+  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-mode={mode} className={`experience ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' || actionPaused ? 'is-paused' : ''}`} ref={root}>
     <div className="stage">
       <div className="camera" ref={camera}>
         <ParallaxScene scene={scene} />
@@ -250,7 +271,7 @@ export default function CinematicApp() {
           <div className="contact-shadow" ref={contactShadow} style={scene.shadow ? { backgroundImage: `url("${scene.shadow}")` } : undefined} />
           <div className="scene-prop" ref={prop} style={{ left: `${x / 16.72}%`, top: `${y / 9.41}%`, width: `${w / 16.72}%`, height: `${h / 9.41}%` }}>
             <img src={scene.prop} alt="" draggable="false" />
-            {phase === 'room' && <button className="prop-hotspot" aria-label={`打开${scene.exhibit.title}`} onClick={() => { stopAuto(); openDocumentAction(); }}><span>查看文献</span></button>}
+            {phase === 'room' && !tour && <button className="prop-hotspot" aria-label={`打开${scene.exhibit.title}`} onClick={() => { stopAuto(); setMode('reference'); openDocumentAction(); }}><span>查看文献</span></button>}
           </div>
         </div>
       </div>
@@ -268,21 +289,23 @@ export default function CinematicApp() {
       <div className="location">{phase === 'present' ? `${scene.caseData.year} · ${scene.caseData.place}` : `${scene.history.year} · ${scene.history.place}`}</div>
     </header>
     {intro && phase === 'room' && <div className="narration ui">{scene.intro}</div>}
-    {phase === 'room' && !intro && <div className="hint ui">点击桌上的文献</div>}
+    {mode === 'reference' && phase === 'room' && !intro && <div className="hint ui">点击桌上的文献</div>}
 
     <div className="reading-wrap" ref={paper} aria-hidden={!isReading}>
-      <div className={`paper-image ${scene.id === 'yanan' ? 'archive-paper' : ''}`} style={{ backgroundImage: `url("${scene.id === 'zunyi' ? atlas : scene.id === 'yanan' ? archiveDocument : openDocument}")` }}>
+      <div className={`paper-image ${scene.id === 'yanan' ? 'archive-paper' : scene.id === 'zunyi' ? 'map-paper' : ''}`} style={{ backgroundImage: `url("${scene.id === 'yanan' ? archiveDocument : openDocument}")`, '--archive-art': `url("${archiveDocument}")` } as React.CSSProperties}>
+        {scene.id === 'yanan' && <div className="archive-sheet" aria-hidden="true"><div className="archive-extract" /></div>}
+        {scene.id === 'zunyi' && <div className="unrolled-map" aria-hidden="true" style={{ backgroundImage: `url("${atlas}")` }}><svg className="unrolled-route" viewBox="0 0 500 600"><path pathLength="1" d="M80 465 C140 360 250 380 260 250 S365 190 410 95" /></svg><span>地图意象 · 非真实路线</span></div>}
         <div className="paper-content">
-          <div className="paper-left"><div className="paper-kicker">{scene.history.year} · 历史文献</div><h2>{scene.exhibit.title}</h2><div className="paper-rule" /><p>{scene.id === 'zunyi' ? '历史事实 · 现代排印' : '毛泽东著作 · 现代排印'}</p><small>艺术重建，非原件影像</small></div>
+          <div className="paper-left"><div className="paper-kicker">{scene.history.year} · 历史文献</div><h2>{scene.id === 'yanan' ? <>《关于领导方法的<br />若干问题》</> : scene.exhibit.title}</h2><div className="paper-rule" /><p>{scene.id === 'zunyi' ? '历史事实 · 现代排印' : '毛泽东著作 · 现代排印'}</p><small>艺术重建，非原件影像</small></div>
           <div className="paper-right">
-            {page === 0 ? <><div className="paper-kicker">{scene.history.quote ? '原典节录' : '历史事实 · 地图意象'}</div>{scene.history.quote ? <blockquote>“{scene.history.quote}”</blockquote> : <blockquote>立足实际<br />独立探索</blockquote>}{autoState === 'off' && <><p>{scene.history.fact}</p><small>{scene.history.quoteNote}</small></>}</> : <><div className="paper-kicker">从历史到今天 · 本组分析</div><h3>{scene.caseData.shortTitle}</h3><p>{scene.history.analysis}</p><p>{scene.caseData.facts[0].text}</p></>}
+            {page === 0 ? <><div className="paper-kicker">{scene.history.quote ? '原典节录' : '历史事实 · 地图意象'}</div>{scene.history.quote ? <blockquote>{scene.id === 'yanan' ? <>“{scene.history.quote.split('，')[0]}，<br />{scene.history.quote.split('，')[1]}”</> : `“${scene.history.quote}”`}</blockquote> : <blockquote>立足实际<br />独立探索</blockquote>}{autoState === 'off' && <><p>{scene.history.fact}</p><small>{scene.history.quoteNote}</small></>}</> : <><div className="paper-kicker">从历史到今天 · 本组分析</div><h3>{scene.caseData.shortTitle}</h3><p>{scene.history.analysis}</p><p>{scene.caseData.facts[0].text}</p></>}
           </div>
         </div>
         <div className="paper-controls"><button onClick={() => setPage(page === 0 ? 1 : 0)} disabled={phase !== 'reading'}>{page === 0 ? '继续阅读 →' : '← 返回节录'}</button><button onClick={showArchive} disabled={phase !== 'reading'}>资料模式</button><button onClick={() => { stopAuto(); closeDocument(); }} disabled={phase !== 'reading'}>收起文献 ×</button></div>
       </div>
     </div>
 
-    <div className="map-wrap" ref={map} aria-hidden="true" style={{ backgroundImage: `url("${atlas}")` }}>
+    <div className={`map-wrap ${scene.id === 'zunyi' ? 'zunyi-map-transition' : ''}`} ref={map} aria-hidden="true" style={{ backgroundImage: `url("${atlas}")` }}>
       <div className="map-label map-from"><b>{scene.history.year}</b><span>{scene.transitionFrom}</span></div>
       <svg className="map-route" viewBox="0 0 1000 300"><path pathLength="1" d="M120 210 C300 150 480 200 620 100 S850 55 920 65" /></svg>
       <div className="map-label map-to"><b>{scene.caseData.year}</b><span>{scene.transitionTo}</span></div>
@@ -295,7 +318,11 @@ export default function CinematicApp() {
       {interlude === 'intro' ? <><p>毛泽东思想活的灵魂</p><h2>思想常青</h2><div className="interlude-rule" /><div>从历史出发，回答今天的问题。</div></> : <><p>终章 · 思想何以常青</p><h2>回到现实，<br />继续寻找答案。</h2><div className="interlude-rule" /><div>尊重事实 · 依靠人民 · 掌握主动</div></>}
     </section>}
 
-    <footer className="controls ui">
+    {mode === 'performance' ? <footer className="performance-controls ui" aria-label="演出控制">
+      <button onClick={autoState === 'off' ? startTour : pause} disabled={autoState === 'off' && !['room', 'present'].includes(phase)}>{autoState === 'playing' ? 'Ⅱ 暂停' : '▶ 播放'}</button>
+      <button onClick={skipChapter}>跳过本章</button>
+      <div className="chapter-picker"><button aria-label={`章节 ${String(index + 1).padStart(2, '0')} / 03`} onClick={() => setChaptersOpen(!chaptersOpen)}>{String(index + 1).padStart(2, '0')} / 03</button>{chaptersOpen && <div className="chapter-menu">{scenes.map((item, i) => <button key={item.id} onClick={() => jumpChapter(i)}>{item.chapter} · {item.theme}</button>)}<button onClick={enterReference}>进入资料模式</button></div>}</div>
+    </footer> : <footer className="controls ui">
       <div className="controls-left"><span className="art-note">艺术重建 · 非历史照片</span></div>
       <div className="controls-right">
         {(phase === 'room' || phase === 'present') && autoState === 'off' && <button onClick={startTour}>▶ 全片导览</button>}
@@ -308,9 +335,10 @@ export default function CinematicApp() {
         {(phase === 'room' || phase === 'present') && autoState === 'off' && <button onClick={showArchive}>资料模式</button>}
         {(phase === 'room' || phase === 'present' || tour) && <div className="chapter-picker"><button onClick={() => setChaptersOpen(!chaptersOpen)}>章节 {String(index + 1).padStart(2, '0')} / 03</button>{chaptersOpen && <div className="chapter-menu">{scenes.map((item, i) => <button key={item.id} onClick={() => jumpChapter(i)}>{item.chapter} · {item.theme}</button>)}</div>}</div>}
         {interlude === 'outro' && autoState === 'off' && <button onClick={() => setInterlude(null)}>返回章节</button>}
+        {(phase === 'room' || phase === 'present') && autoState === 'off' && <button onClick={() => { setInterlude(null); setMode('performance'); }}>返回演出模式</button>}
         <button onClick={() => setHidden(true)} aria-label="隐藏界面">隐藏界面 <kbd>H</kbd></button>
       </div>
-    </footer>
+    </footer>}
     {hidden && <button className="restore-ui" onClick={() => setHidden(false)}>显示界面 <kbd>H</kbd></button>}
     {archive && <ArchivePanel scene={scene} close={() => setArchive(false)} />}
   </main>;
