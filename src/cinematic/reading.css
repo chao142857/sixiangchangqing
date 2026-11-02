@@ -7,7 +7,7 @@
 .explore-controls .chapter-menu{left:0;right:auto;bottom:calc(100% + 10px);width:270px;text-align:left}
 .explore-controls .chapter-menu button{padding:13px 0;text-align:left}
 .exploration .reading-wrap{width:min(86vw,1420px);height:auto;aspect-ratio:1672/941;max-height:83vh;overflow:visible}
-.reader-art{position:relative;width:100%;height:100%;background-size:100% 100%;color:#302219;font-family:"Songti SC","STSong","Noto Serif CJK SC",serif;perspective:1400px}
+.reader-art{position:relative;width:100%;height:100%;background-size:100% 100%;color:#302219;font-family:"Songti SC","STSong","Noto Serif CJK SC",serif;perspective:1400px;isolation:isolate}
 .reader-art .reader-spread{position:absolute;inset:12% 9% 19%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12%;padding:0;transform-style:preserve-3d;isolation:isolate}
 .reader-leaf{min-width:0;position:relative;display:flex;flex-direction:column;gap:0;justify-content:flex-start}
 .reader-leaf h2{font:500 clamp(23px,1.8vw,34px)/1.45 "Songti SC","STSong",serif;letter-spacing:.04em;margin:0 0 18px;text-wrap:pretty}
@@ -23,19 +23,24 @@
 @keyframes turn-paper{from{transform:translateX(-30%);opacity:.7}to{transform:translateX(25%);opacity:0}}
 
 /* The folder and extracted sheet reuse the existing artwork, but the type is front-facing. */
-.reader-yanan{background-image:none!important}
-.reader-yanan::before{content:"";position:absolute;inset:-3%;background:var(--archive-art) center/100% 100% no-repeat;transform:rotate(3.6deg);pointer-events:none}
-.reader-yanan .reader-spread{inset:14% 16% 21% 23%;gap:7%}
+.reader-yanan{background-image:none!important;--archive-copy-inset:15% 22% 22% 24%}
+.reader-yanan::before{content:"";position:absolute;z-index:0;inset:-3%;background:var(--archive-art) center/100% 100% no-repeat;transform:rotate(3.6deg);pointer-events:none}
+.reader-yanan .archive-sheet{z-index:1}
+.reader-yanan .reader-spread{inset:var(--archive-copy-inset);gap:7%;z-index:2}
 .reader-yanan .reader-leaf h2{font-size:clamp(21px,1.55vw,29px);margin-bottom:16px}
 .reader-yanan .reader-leaf blockquote{font-size:clamp(21px,1.45vw,28px);margin-bottom:16px}
 .reader-yanan .leaf-copy p{font-size:clamp(16px,1.15vw,22px);line-height:1.8}
-.reader-yanan .reader-controls{left:23%;right:16%;bottom:14%}
+.reader-yanan .reader-controls{left:24%;right:22%;bottom:14%;z-index:5}
 .reader-turning-leaf{position:absolute;left:50%;right:9%;top:12%;bottom:19%;z-index:4;pointer-events:none;background-size:200% 100%;background-position:right center;transform-origin:left center;box-shadow:-7px 0 18px #42271044;backface-visibility:hidden;animation:leaf-over .5s cubic-bezier(.25,.6,.4,1) both;padding:0 4px;overflow:hidden}
 .reader-turning-leaf .reader-leaf{height:100%}.reader-turning-leaf.turn-backward{left:9%;right:50%;background-position:left center;transform-origin:right center;animation-name:leaf-back}
 @keyframes leaf-over{0%{transform:rotateY(0);opacity:1}85%{opacity:1}100%{transform:rotateY(-100deg);opacity:0}}
 @keyframes leaf-back{0%{transform:rotateY(0);opacity:1}85%{opacity:1}100%{transform:rotateY(100deg);opacity:0}}
-.reader-yanan .reader-turning-leaf,.reader-yanan .reader-turning-leaf.turn-backward{inset:14% 16% 21% 23%;background-size:100% 100%;background-position:center;transform-origin:center;animation:archive-page-out .5s ease-in both;padding:0 24px}
-@keyframes archive-page-out{to{transform:translateY(-10%) rotate(-1deg);opacity:0}}
+.reader-turning-sheet{position:absolute;inset:0;z-index:3;pointer-events:none;transform-origin:center;animation:archive-sheet-out .5s ease-in both}
+.reader-turning-sheet.sheet-backward{animation-name:archive-sheet-back}
+.archive-turn-paper{position:absolute;inset:-3%;background:var(--archive-art) center/100% 100% no-repeat;transform:rotate(3.6deg);clip-path:polygon(18.6% 12%,77.7% 5%,82.7% 81%,18.6% 90%);filter:drop-shadow(0 6px 8px #2c1d1444)}
+.reader-sheet-copy{position:absolute;inset:var(--archive-copy-inset);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7%}
+@keyframes archive-sheet-out{to{transform:translateY(-5%) rotateX(5deg);opacity:0}}
+@keyframes archive-sheet-back{to{transform:translateY(5%) rotateX(-5deg);opacity:0}}
 
 /* A map remains visible beside a two-column history notebook, not a blank cover. */
 .reader-zunyi{background-image:none!important;color:#f2e7d5}
@@ -62,6 +67,6 @@
  .reader-yanan::before,.reader-yanan .archive-sheet{display:none}
  .reader-zunyi{color:#302219}.reader-zunyi .unrolled-map{position:relative;left:auto;top:auto;margin:auto;width:75%;height:32vh}
  .reader-zunyi .leaf-sources a,.reader-zunyi .reader-controls button,.reader-zunyi .reader-controls span{color:#884d35}
- .reader-turning-leaf{display:none}
+ .reader-turning-leaf,.reader-turning-sheet{display:none}
 }
 @media(prefers-reduced-motion:reduce){.reader-spread[data-turning="true"]::after{animation:none}}
