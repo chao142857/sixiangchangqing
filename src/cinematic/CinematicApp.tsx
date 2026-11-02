@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import ArchivePanel from './ArchivePanel';
-import { archiveDocument, atlas, openDocument, scenes, type Scene, type ScenePhase } from './scenes';
+import DocumentReader from './DocumentReader';
+import { atlas, scenes, type Scene, type ScenePhase } from './scenes';
 
 type AutoState = 'off' | 'playing' | 'paused';
 
@@ -33,18 +34,18 @@ export default function CinematicApp() {
   const sceneRef = useRef<Scene>(scenes[0]);
   const tourRef = useRef(false);
   const pausedRef = useRef(false);
+  const resumeAfterReading = useRef(false);
+  const resumeOnRoom = useRef(false);
   const [phase, setPhaseState] = useState<ScenePhase>('room');
   const [index, setIndex] = useState(0);
   const [autoState, setAutoState] = useState<AutoState>('off');
-  const [actionPaused, setActionPaused] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [archive, setArchive] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const [intro, setIntro] = useState(true);
   const [interlude, setInterlude] = useState<'intro' | 'outro' | null>(null);
   const [tour, setTour] = useState(false);
-  const [mode, setMode] = useState<'performance' | 'reference'>('performance');
+  const [manualReading, setManualReading] = useState(false);
   const scene = scenes[index];
   sceneRef.current = scene;
 
@@ -52,7 +53,8 @@ export default function CinematicApp() {
   const setAmbientPaused = useCallback((paused: boolean) => { pausedRef.current = paused; ambient.current.forEach(tween => paused ? tween.pause() : tween.resume()); }, []);
   const stopAuto = useCallback(() => {
     auto.current?.kill(); auto.current = null; action.current?.resume(); setAmbientPaused(false);
-    setActionPaused(false); setAutoState('off'); setTour(false); tourRef.current = false; setInterlude(null);
+    setAutoState('off'); setTour(false); tourRef.current = false; setInterlude(null);
+    setManualReading(false); resumeAfterReading.current = false; resumeOnRoom.current = false;
   }, [setAmbientPaused]);
 
   useEffect(() => {
@@ -65,10 +67,6 @@ export default function CinematicApp() {
     }, root);
     return () => { ctx.revert(); ambient.current = []; };
   }, [index, scene.exterior]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setIntro(false), 8500);
-    return () => window.clearTimeout(timer);
-  }, [index]);
   useEffect(() => () => { action.current?.kill(); auto.current?.kill(); }, []);
 
   // Compute a transform from the on-desk prop to the centered reading object.
@@ -88,7 +86,7 @@ export default function CinematicApp() {
 
   const openDocumentAction = useCallback(() => {
     if (phaseRef.current !== 'room') return;
-    setIntro(false); setPage(0); setPhase('opening'); action.current?.kill();
+    setPage(0); setPhase('opening'); action.current?.kill();
     gsap.set(paper.current, { clearProps: 'transform,opacity,visibility' });
     const documentKind = sceneRef.current.id;
     const timeline = gsap.timeline({ onComplete: () => setPhase('reading') })
@@ -126,7 +124,7 @@ export default function CinematicApp() {
 
   const goPresent = useCallback(() => {
     if (phaseRef.current !== 'room') return;
-    setIntro(false); setPhase('transitioning'); action.current?.kill();
+    setPhase('transitioning'); action.current?.kill();
     gsap.set(map.current, { clearProps: 'transform,opacity,visibility' });
     gsap.set('.map-label, .map-route', { autoAlpha: 0 });
     action.current = gsap.timeline({ onComplete: () => setPhase('present') })
@@ -158,16 +156,6 @@ export default function CinematicApp() {
       .set(modern.current, { opacity: 0 });
   }, [setPhase]);
 
-  const startAuto = useCallback(() => {
-    if (phaseRef.current !== 'room') return;
-    auto.current?.kill(); setAutoState('playing');
-    auto.current = gsap.timeline({ onComplete: () => setAutoState('off') })
-      .addLabel('document', 3).call(openDocumentAction, [], 'document')
-      .addLabel('close', 10.5).call(closeDocument, [], 'close')
-      .addLabel('present', 13.4).call(goPresent, [], 'present')
-      .addLabel('end', 34).call(() => setAutoState('off'), [], 'end');
-  }, [openDocumentAction, closeDocument, goPresent]);
-
   const resetVisuals = useCallback(() => {
     gsap.set(camera.current, { xPercent: 0, yPercent: 0, scale: 1 });
     gsap.set(prop.current, { autoAlpha: 1, xPercent: 0, yPercent: 0, rotation: 0, rotationX: 0, scale: 1, filter: 'drop-shadow(0px 5px 4px rgba(9,7,4,0.55))' });
@@ -176,22 +164,24 @@ export default function CinematicApp() {
     gsap.set([paper.current, map.current], { autoAlpha: 0, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0, rotationX: 0 });
   }, []);
 
-  const changeChapter = useCallback((next: number, preserveAuto = false) => {
+  const changeChapter = useCallback((next: number, preserveAuto = false, showPresent = false) => {
     if (!['room', 'present'].includes(phaseRef.current) || next === indexRef.current) { setChaptersOpen(false); return; }
     if (!preserveAuto) stopAuto();
     setPhase('chapter-changing'); setChaptersOpen(false); action.current?.kill();
-    action.current = gsap.timeline({ onComplete: () => { setIntro(true); setPhase('room'); } })
+    action.current = gsap.timeline({ onComplete: () => { setPhase('room'); if (showPresent) goPresent(); } })
       .fromTo(chapterCurtain.current, { scaleX: 0, transformOrigin: 'left', autoAlpha: 1 }, { scaleX: 1, duration: 0.75, ease: 'power2.inOut' })
       .call(() => {
         resetVisuals(); indexRef.current = next; sceneRef.current = scenes[next]; setIndex(next); setPage(0);
       })
       .to(chapterCurtain.current, { scaleX: 0, transformOrigin: 'right', duration: 0.75, ease: 'power2.inOut' });
-  }, [resetVisuals, setPhase, stopAuto]);
+  }, [goPresent, resetVisuals, setPhase, stopAuto]);
 
   const startTour = useCallback(() => {
-    if (!['room', 'present'].includes(phaseRef.current)) return;
+    if (phaseRef.current === 'chapter-changing') return;
     auto.current?.kill(); action.current?.kill(); action.current = null;
-    resetVisuals(); indexRef.current = 0; sceneRef.current = scenes[0]; setIndex(0); setPage(0); setPhase('room'); setIntro(false);
+    resetVisuals(); gsap.set(chapterCurtain.current, { scaleX: 0, autoAlpha: 0 });
+    indexRef.current = 0; sceneRef.current = scenes[0]; setIndex(0); setPage(0); setPhase('room');
+    setChaptersOpen(false); setManualReading(false); resumeAfterReading.current = false; resumeOnRoom.current = false; setAmbientPaused(false);
     setInterlude('intro'); tourRef.current = true; setTour(true); setAutoState('playing');
     const timeline = gsap.timeline({ onComplete: () => { setAutoState('off'); setTour(false); tourRef.current = false; } });
     timeline.addLabel('序幕', 0).addLabel('序幕结束', 7).call(() => setInterlude(null), [], '序幕结束');
@@ -205,30 +195,52 @@ export default function CinematicApp() {
     timeline.addLabel('终章', 114).call(() => setInterlude('outro'), [], '终章')
       .addLabel('结束', 124).call(() => {}, [], '结束');
     auto.current = timeline;
-  }, [changeChapter, closeDocument, goPresent, openDocumentAction, resetVisuals, setPhase]);
+  }, [changeChapter, closeDocument, goPresent, openDocumentAction, resetVisuals, setAmbientPaused, setPhase]);
+
+  const takeOverReading = useCallback(() => {
+    if (!auto.current || !tourRef.current) return;
+    auto.current.pause(); setAutoState('paused'); setManualReading(true);
+    resumeAfterReading.current = true; setAmbientPaused(true);
+    // Complete only the current prop entrance; the master narration remains paused.
+    if (phaseRef.current === 'opening') action.current?.progress(1);
+  }, [setAmbientPaused]);
+
+  useEffect(() => {
+    if (phase !== 'room' || !resumeOnRoom.current || !auto.current) return;
+    resumeOnRoom.current = false; resumeAfterReading.current = false;
+    setManualReading(false); setAmbientPaused(false); setAutoState('playing');
+    goPresent(); auto.current.seek(`present-${indexRef.current}`, true).resume();
+  }, [phase, goPresent, setAmbientPaused]);
+
+  const resumeGuide = () => {
+    if (resumeAfterReading.current) {
+      resumeOnRoom.current = true;
+      if (phaseRef.current === 'reading') closeDocument();
+      else if (phaseRef.current === 'room' && auto.current) {
+        resumeOnRoom.current = false; resumeAfterReading.current = false;
+        setManualReading(false); setAmbientPaused(false); setAutoState('playing');
+        goPresent(); auto.current.seek(`present-${indexRef.current}`, true).resume();
+      }
+    } else { auto.current?.resume(); action.current?.resume(); setAmbientPaused(false); setAutoState('playing'); }
+  };
 
   const pause = () => {
     if (autoState !== 'off') {
       if (autoState === 'playing') { auto.current?.pause(); action.current?.pause(); setAmbientPaused(true); setAutoState('paused'); }
-      else { auto.current?.resume(); action.current?.resume(); setAmbientPaused(false); setAutoState('playing'); }
-    } else if (actionPaused) { action.current?.resume(); setAmbientPaused(false); setActionPaused(false); }
-    else { action.current?.pause(); setAmbientPaused(true); setActionPaused(true); }
-  };
-  const skip = () => {
-    if (action.current?.isActive() || action.current?.paused()) action.current.progress(1);
-    setActionPaused(false); setAmbientPaused(false);
-    if (auto.current && autoState !== 'off') {
-      if (autoState === 'paused') { auto.current.resume(); setAutoState('playing'); }
-      const next = auto.current.nextLabel(); if (next) auto.current.seek(next, false);
+      else resumeGuide();
     }
   };
-  const showArchive = () => { stopAuto(); setArchive(true); };
+  const showArchive = () => {
+    if (tourRef.current) { auto.current?.pause(); action.current?.pause(); setAutoState('paused'); setAmbientPaused(true); }
+    setChaptersOpen(false); setArchive(true);
+  };
   const jumpChapter = (next: number) => {
     if (!tourRef.current || !auto.current) { changeChapter(next); return; }
     action.current?.kill(); action.current = null; resetVisuals();
     gsap.set(chapterCurtain.current, { scaleX: 0, autoAlpha: 0 });
     indexRef.current = next; sceneRef.current = scenes[next]; setIndex(next); setPage(0);
-    setInterlude(null); setIntro(false); setChaptersOpen(false); setPhase('room');
+    setInterlude(null); setChaptersOpen(false); setPhase('room');
+    setManualReading(false); resumeAfterReading.current = false; resumeOnRoom.current = false;
     auto.current.seek(`chapter-${next}`, true);
   };
   const skipChapter = () => {
@@ -243,9 +255,16 @@ export default function CinematicApp() {
     setPhase('present'); setInterlude('outro'); setChaptersOpen(false);
     auto.current.seek('终章', true);
   };
-  const enterReference = () => {
-    if (action.current?.isActive() || action.current?.paused()) action.current.progress(1);
-    stopAuto(); setChaptersOpen(false); setMode('reference');
+  const exploreChapter = (next: number) => {
+    action.current?.kill(); action.current = null; stopAuto(); resetVisuals();
+    gsap.set(chapterCurtain.current, { scaleX: 0, autoAlpha: 0 }); setPhase('room'); setChaptersOpen(false);
+    if (next !== indexRef.current) changeChapter(next);
+    setPage(0);
+  };
+  const closeManually = useCallback(() => { takeOverReading(); closeDocument(); }, [takeOverReading, closeDocument]);
+  const turnPage = (next: number) => {
+    if (phaseRef.current !== 'reading') return;
+    takeOverReading(); setPage(next);
   };
 
   useEffect(() => {
@@ -253,16 +272,17 @@ export default function CinematicApp() {
       if (event.key.toLowerCase() === 'h' && !archive) setHidden(value => !value);
       if (event.key === 'Escape') {
         if (archive) setArchive(false);
-        else if (phaseRef.current === 'reading') { stopAuto(); closeDocument(); }
+        else if (chaptersOpen) setChaptersOpen(false);
+        else if (phaseRef.current === 'reading') closeManually();
       }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
-  }, [archive, closeDocument, stopAuto]);
+  }, [archive, chaptersOpen, closeManually]);
 
   const isReading = ['opening', 'reading', 'closing'].includes(phase);
   const isBusy = ['opening', 'closing', 'transitioning', 'chapter-changing'].includes(phase);
   const [x, y, w, h] = scene.bounds;
-  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-mode={mode} className={`experience ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' || actionPaused ? 'is-paused' : ''}`} ref={root}>
+  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-reading={manualReading ? 'manual' : 'normal'} data-mode={tour ? 'guided' : 'explore'} className={`experience exploration ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' ? 'is-paused' : ''}`} ref={root}>
     <div className="stage">
       <div className="camera" ref={camera}>
         <ParallaxScene scene={scene} />
@@ -271,7 +291,7 @@ export default function CinematicApp() {
           <div className="contact-shadow" ref={contactShadow} style={scene.shadow ? { backgroundImage: `url("${scene.shadow}")` } : undefined} />
           <div className="scene-prop" ref={prop} style={{ left: `${x / 16.72}%`, top: `${y / 9.41}%`, width: `${w / 16.72}%`, height: `${h / 9.41}%` }}>
             <img src={scene.prop} alt="" draggable="false" />
-            {phase === 'room' && !tour && <button className="prop-hotspot" aria-label={`打开${scene.exhibit.title}`} onClick={() => { stopAuto(); setMode('reference'); openDocumentAction(); }}><span>查看文献</span></button>}
+            {phase === 'room' && !interlude && <button className="prop-hotspot" aria-label={`打开${scene.exhibit.title}`} onClick={() => { takeOverReading(); openDocumentAction(); }}><span>查看文献</span></button>}
           </div>
         </div>
       </div>
@@ -283,62 +303,32 @@ export default function CinematicApp() {
     </div>
 
     <header className="scene-heading ui">
-      <div className="brand">思想常青 <span> / </span> 毛泽东思想的活的灵魂</div>
-      <div className="heading-rule" /><p>{scene.chapter} · {scene.theme}</p>
-      <h1>{phase === 'present' ? scene.caseData.title : scene.title}</h1>
-      <div className="location">{phase === 'present' ? `${scene.caseData.year} · ${scene.caseData.place}` : `${scene.history.year} · ${scene.history.place}`}</div>
+      <h1>{phase === 'present' ? scene.caseData.title : ['寻乌调查', '延安', '遵义会议'][index]}</h1>
     </header>
-    {intro && phase === 'room' && <div className="narration ui">{scene.intro}</div>}
-    {mode === 'reference' && phase === 'room' && !intro && <div className="hint ui">点击桌上的文献</div>}
 
     <div className="reading-wrap" ref={paper} aria-hidden={!isReading}>
-      <div className={`paper-image ${scene.id === 'yanan' ? 'archive-paper' : scene.id === 'zunyi' ? 'map-paper' : ''}`} style={{ backgroundImage: `url("${scene.id === 'yanan' ? archiveDocument : openDocument}")`, '--archive-art': `url("${archiveDocument}")` } as React.CSSProperties}>
-        {scene.id === 'yanan' && <div className="archive-sheet" aria-hidden="true"><div className="archive-extract" /></div>}
-        {scene.id === 'zunyi' && <div className="unrolled-map" aria-hidden="true" style={{ backgroundImage: `url("${atlas}")` }}><svg className="unrolled-route" viewBox="0 0 500 600"><path pathLength="1" d="M80 465 C140 360 250 380 260 250 S365 190 410 95" /></svg><span>地图意象 · 非真实路线</span></div>}
-        <div className="paper-content">
-          <div className="paper-left"><div className="paper-kicker">{scene.history.year} · 历史文献</div><h2>{scene.id === 'yanan' ? <>《关于领导方法的<br />若干问题》</> : scene.exhibit.title}</h2><div className="paper-rule" /><p>{scene.id === 'zunyi' ? '历史事实 · 现代排印' : '毛泽东著作 · 现代排印'}</p><small>艺术重建，非原件影像</small></div>
-          <div className="paper-right">
-            {page === 0 ? <><div className="paper-kicker">{scene.history.quote ? '原典节录' : '历史事实 · 地图意象'}</div>{scene.history.quote ? <blockquote>{scene.id === 'yanan' ? <>“{scene.history.quote.split('，')[0]}，<br />{scene.history.quote.split('，')[1]}”</> : `“${scene.history.quote}”`}</blockquote> : <blockquote>立足实际<br />独立探索</blockquote>}{autoState === 'off' && <><p>{scene.history.fact}</p><small>{scene.history.quoteNote}</small></>}</> : <><div className="paper-kicker">从历史到今天 · 本组分析</div><h3>{scene.caseData.shortTitle}</h3><p>{scene.history.analysis}</p><p>{scene.caseData.facts[0].text}</p></>}
-          </div>
-        </div>
-        <div className="paper-controls"><button onClick={() => setPage(page === 0 ? 1 : 0)} disabled={phase !== 'reading'}>{page === 0 ? '继续阅读 →' : '← 返回节录'}</button><button onClick={showArchive} disabled={phase !== 'reading'}>资料模式</button><button onClick={() => { stopAuto(); closeDocument(); }} disabled={phase !== 'reading'}>收起文献 ×</button></div>
-      </div>
+      <DocumentReader scene={scene} page={page} disabled={phase !== 'reading'} onPage={turnPage} onClose={closeManually} onTakeOver={takeOverReading} />
     </div>
 
     <div className={`map-wrap ${scene.id === 'zunyi' ? 'zunyi-map-transition' : ''}`} ref={map} aria-hidden="true" style={{ backgroundImage: `url("${atlas}")` }}>
       <div className="map-label map-from"><b>{scene.history.year}</b><span>{scene.transitionFrom}</span></div>
       <svg className="map-route" viewBox="0 0 1000 300"><path pathLength="1" d="M120 210 C300 150 480 200 620 100 S850 55 920 65" /></svg>
       <div className="map-label map-to"><b>{scene.caseData.year}</b><span>{scene.transitionTo}</span></div>
-      <small>方法联系示意 · 非地理路线</small>
     </div>
 
-    {phase === 'present' && <section className="present-caption ui"><div className="caption-mark" /><div><span>当代回响 · {scene.caseData.title}</span><p>{scene.id === 'zunyi' ? '独立自主与开放合作，可以并行。' : scene.caseData.lead}</p><small>{scene.id === 'zunyi' ? '卫星与轨道为艺术示意；思想联系是本组分析。' : '思想联系是本组的方法论分析。'}</small></div></section>}
+    {phase === 'present' && <section className="present-caption ui"><div className="caption-mark" /><div><p>{scene.id === 'zunyi' ? '独立自主与开放合作，可以并行。' : scene.caseData.lead}</p></div></section>}
 
     {interlude && <section className={`interlude ui interlude-${interlude}`}>
       {interlude === 'intro' ? <><p>毛泽东思想活的灵魂</p><h2>思想常青</h2><div className="interlude-rule" /><div>从历史出发，回答今天的问题。</div></> : <><p>终章 · 思想何以常青</p><h2>回到现实，<br />继续寻找答案。</h2><div className="interlude-rule" /><div>尊重事实 · 依靠人民 · 掌握主动</div></>}
     </section>}
 
-    {mode === 'performance' ? <footer className="performance-controls ui" aria-label="演出控制">
-      <button onClick={autoState === 'off' ? startTour : pause} disabled={autoState === 'off' && !['room', 'present'].includes(phase)}>{autoState === 'playing' ? 'Ⅱ 暂停' : '▶ 播放'}</button>
-      <button onClick={skipChapter}>跳过本章</button>
-      <div className="chapter-picker"><button aria-label={`章节 ${String(index + 1).padStart(2, '0')} / 03`} onClick={() => setChaptersOpen(!chaptersOpen)}>{String(index + 1).padStart(2, '0')} / 03</button>{chaptersOpen && <div className="chapter-menu">{scenes.map((item, i) => <button key={item.id} onClick={() => jumpChapter(i)}>{item.chapter} · {item.theme}</button>)}<button onClick={enterReference}>进入资料模式</button></div>}</div>
-    </footer> : <footer className="controls ui">
-      <div className="controls-left"><span className="art-note">艺术重建 · 非历史照片</span></div>
-      <div className="controls-right">
-        {(phase === 'room' || phase === 'present') && autoState === 'off' && <button onClick={startTour}>▶ 全片导览</button>}
-        {phase === 'room' && autoState === 'off' && <button onClick={startAuto}>自动播放本章</button>}
-        {autoState !== 'off' && <><button onClick={pause}>{autoState === 'playing' ? 'Ⅱ 暂停' : '▶ 继续'}</button><button onClick={stopAuto}>退出自动播放</button></>}
-        {autoState === 'off' && isBusy && phase !== 'chapter-changing' && <button onClick={pause}>{actionPaused ? '▶ 继续演出' : 'Ⅱ 暂停演出'}</button>}
-        {(autoState !== 'off' || isBusy) && <button onClick={skip}>跳过 ›</button>}
-        {phase === 'room' && <button onClick={() => { stopAuto(); goPresent(); }}>走向当代 →</button>}
-        {phase === 'present' && <button onClick={() => { stopAuto(); returnRoom(); }}>← 返回历史</button>}
-        {(phase === 'room' || phase === 'present') && autoState === 'off' && <button onClick={showArchive}>资料模式</button>}
-        {(phase === 'room' || phase === 'present' || tour) && <div className="chapter-picker"><button onClick={() => setChaptersOpen(!chaptersOpen)}>章节 {String(index + 1).padStart(2, '0')} / 03</button>{chaptersOpen && <div className="chapter-menu">{scenes.map((item, i) => <button key={item.id} onClick={() => jumpChapter(i)}>{item.chapter} · {item.theme}</button>)}</div>}</div>}
-        {interlude === 'outro' && autoState === 'off' && <button onClick={() => setInterlude(null)}>返回章节</button>}
-        {(phase === 'room' || phase === 'present') && autoState === 'off' && <button onClick={() => { setInterlude(null); setMode('performance'); }}>返回演出模式</button>}
-        <button onClick={() => setHidden(true)} aria-label="隐藏界面">隐藏界面 <kbd>H</kbd></button>
-      </div>
-    </footer>}
+    <footer className="explore-controls ui" aria-label="场景操作">
+      <div className="chapter-picker"><button aria-expanded={chaptersOpen} onClick={() => setChaptersOpen(!chaptersOpen)}>目录</button>{chaptersOpen && <nav className="chapter-menu" aria-label="目录">{scenes.map((item, i) => <button key={item.id} onClick={() => exploreChapter(i)}>{item.chapter} · {['寻乌调查', '延安', '遵义会议'][i]}</button>)}<button onClick={startTour}>自动导览</button><button onClick={showArchive}>参考文献与制作说明</button></nav>}</div>
+      {autoState === 'off' ? <>
+        {!isReading && <><button disabled={isBusy || (index === 0 && phase === 'room')} onClick={() => { setInterlude(null); if (phase === 'present') returnRoom(); else if (index > 0) changeChapter(index - 1, false, true); }}>上一场景</button><button disabled={isBusy || (index === 2 && phase === 'present')} onClick={() => { setInterlude(null); if (phase === 'room') goPresent(); else if (index < 2) changeChapter(index + 1); }}>下一场景</button></>}
+        <button onClick={startTour} disabled={phase === 'chapter-changing'}>自动导览</button>
+      </> : <><button onClick={pause}>{autoState === 'playing' ? '暂停导览' : '继续导览'}</button><button onClick={skipChapter}>跳过本章</button><button onClick={stopAuto}>退出导览</button></>}
+    </footer>
     {hidden && <button className="restore-ui" onClick={() => setHidden(false)}>显示界面 <kbd>H</kbd></button>}
     {archive && <ArchivePanel scene={scene} close={() => setArchive(false)} />}
   </main>;
