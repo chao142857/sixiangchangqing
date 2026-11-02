@@ -6,6 +6,8 @@ dist/
 test-results/
 backups/
 output/
+# Finale draft is preserved locally; only the runtime hero is published.
+/public/assets/scenes/finale/legacy-scroll.png
 tmp/
 .env
 .env.*

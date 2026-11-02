@@ -161,10 +161,11 @@ try {
       await checkLayout(uninterrupted);
     }
   }
-  await uninterrupted.clock.runFor(19000);
-  assert(await uninterrupted.locator('.interlude-outro').isVisible());
+  await uninterrupted.clock.runFor(33000);
+  assert(await uninterrupted.locator('.finale').isVisible());
+  assert(await uninterrupted.getByRole('button', { name: '再次观看' }).isVisible());
   assert.equal(await uninterrupted.locator('main').getAttribute('data-tour'), 'off');
-  record.push('不中断124秒导览按顺序抵达三章与终章，三章导览书页均有完整正文、无禁用标签');
+  record.push('不中断138秒导览按顺序抵达三章与终章，三章导览书页均有完整正文、无禁用标签');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } }); track(mobile);
   mobile.setDefaultTimeout(15000);

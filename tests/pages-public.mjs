@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 const url = process.env.PUBLIC_URL || 'https://chao142857.github.io/sixiangchangqing/';
 const executablePath = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const out = 'output/pages-public';
+const out = process.env.TEST_OUT || 'output/pages-public';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ executablePath, headless: true });
 const errors = [], passed = [];
@@ -16,7 +16,7 @@ const track = page => {
 };
 const artReady = page => page.evaluate(async () => {
   const urls = new Set();
-  for (const element of document.querySelectorAll('.stage *, .reader-art')) {
+  for (const element of document.querySelectorAll('.stage *, .reader-art, .finale *')) {
     for (const match of getComputedStyle(element).backgroundImage.matchAll(/url\(["']?([^"')]+)["']?\)/g)) urls.add(match[1]);
   }
   await Promise.all([...urls].map(async src => { const image = new Image(); image.src = src; await image.decode(); }));
@@ -36,6 +36,7 @@ try {
   for (const chapter of ['xunwu', 'yanan', 'zunyi']) {
     for (const name of await readdir(`public/assets/scenes/${chapter}`)) paths.push(`assets/scenes/${chapter}/${name}`);
   }
+  paths.push('assets/scenes/finale/archive-hero.png');
   const statuses = [];
   // Use the browser context's request API for a HEAD-only audit. Some Chromium
   // builds emit ERR_ABORTED after a successful in-page HEAD response with no body;
@@ -78,10 +79,48 @@ try {
     await page.getByRole('button',{name:documentName}).waitFor();
     passed.push(`${chapter}：场景、四页阅读、上一页、关闭和前后场景通过`);
   }
+
+  // Verify the manual ending on the deployed repository subpath.
+  await page.getByRole('button', { name: '下一场景' }).click();
+  await page.getByRole('button', { name: '进入终章' }).waitFor();
+  await page.getByRole('button', { name: '进入终章' }).click();
+  await artReady(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  assert.equal(await page.locator('main').getAttribute('data-finale'), 'paused');
+  await page.getByRole('button', { name: '继续', exact: true }).click();
+  await page.getByRole('button', { name: '跳过', exact: true }).click();
+  assert(await page.getByRole('button', { name: '再次观看' }).isVisible());
+  await page.getByRole('button', { name: '再次观看' }).click();
+  assert(await page.getByRole('button', { name: '暂停', exact: true }).isVisible());
+  await page.getByRole('button', { name: '退出', exact: true }).click();
+  assert(await page.getByRole('navigation', { name: '目录' }).isVisible());
+  passed.push('公网手动终章入口、全部图层解码、暂停/继续/跳过/重播/退出通过');
+
   await page.reload({waitUntil:'load'});
   await page.getByRole('heading',{name:'寻乌调查',exact:true}).waitFor();
   await artReady(page);
   passed.push('直接刷新入口不白屏');
+
+  // No fake clock: run the entire public performance, including all three pairs.
+  await page.getByRole('button', { name: '自动导览', exact: true }).click();
+  const start = Date.now();
+  for (const chapter of ['xunwu', 'yanan', 'zunyi']) {
+    await page.waitForFunction(id => document.querySelector('main')?.dataset.chapter === id && document.querySelector('main')?.dataset.phase === 'reading', chapter, { timeout: 50000 });
+    assert((await page.locator('.reader-spread').innerText()).length > 150);
+    await page.waitForFunction(id => document.querySelector('main')?.dataset.chapter === id && document.querySelector('main')?.dataset.phase === 'present', chapter, { timeout: 30000 });
+  }
+  await page.getByRole('button', { name: '再次观看' }).waitFor({ timeout: 50000 });
+  await page.waitForFunction(() => document.querySelector('main')?.dataset.tour === 'off');
+  const seconds = (Date.now() - start) / 1000;
+  assert(seconds >= 136 && seconds <= 146);
+  await artReady(page);
+  await page.screenshot({ path: `${out}/05-公网终章定格.png` });
+  await page.waitForTimeout(1800);
+  assert.equal(await page.locator('main').getAttribute('data-finale'), 'finished');
+  assert.deepEqual(await page.locator('.finale-controls button').allTextContents(), ['再次观看', '返回目录']);
+  await page.getByRole('button', { name: '返回目录' }).click();
+  assert(await page.getByRole('navigation', { name: '目录' }).isVisible());
+  passed.push(`公网完整自动导览实际${seconds.toFixed(1)}秒，三章正文/当代画面/终章与定格通过`);
 
   const mobileContext = await browser.newContext({ viewport:{width:390,height:844}, isMobile:true, hasTouch:true, deviceScaleFactor:2,
     userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
@@ -99,6 +138,6 @@ try {
   await mobile.getByRole('heading',{name:'寻乌调查',exact:true}).waitFor();
   passed.push('手机UA/触摸/390×844模拟：公网访问、翻页、关闭、刷新通过（非实体手机实测）');
   assert.deepEqual(errors, []);
-  await writeFile(`${out}/公网验收.json`,JSON.stringify({ url, passed, assets:statuses, errors },null,2));
+  await writeFile(`${out}/公网验收.json`,JSON.stringify({ url, seconds, passed, assets:statuses, errors },null,2));
   console.log('PASS:',passed.join('; '));
 } finally { await browser.close(); }

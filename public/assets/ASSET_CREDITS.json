@@ -23,5 +23,13 @@
     "generator": "OpenAI 图像生成与编辑工具；三章历史及当代 CG、独立远景、档案夹、clean plate 和星空为生成或编辑的艺术重建",
     "layerProcessing": "透明物件和接触阴影由原图与局部补画结果提取；脚本见 scripts/make-cg-layers.mjs 和 scripts/make-depth-layers.mjs",
     "boundaries": "室内摆设和卫星外观不视为史实；时间连接线为方法联系示意而非地理路线；许可及尚缺图层见 docs/ART_DIRECTION.md"
+  },
+  "finale": {
+    "mainImage": "public/assets/scenes/finale/archive-hero.png",
+    "referenceImage": "public/assets/scenes/finale/legacy-scroll.png",
+    "referenceDistribution": "草图仅本地存档，不随站点发布；运行时只使用mainImage",
+    "origin": "OpenAI 图像生成与编辑；其余蒙太奇复用本项目三章 CG",
+    "boundary": "生成式历史档案长卷意象，不是旧址实景、原件或历史照片；书页纹理不作为原文。旁白为项目原创，不是人物原话。",
+    "audio": "无"
   }
 }

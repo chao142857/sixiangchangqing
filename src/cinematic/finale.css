@@ -1,0 +1,21 @@
+.finale{position:absolute;inset:0;z-index:20;overflow:hidden;background:transparent;pointer-events:none;color:#f5e8cd}
+.finale-shot,.finale-hero,.finale-satellite,.finale-paper{position:absolute;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat;will-change:transform,opacity,clip-path}
+.finale-shot::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#160c08a8,transparent 48%),linear-gradient(0deg,#120b08a8,transparent 33%)}
+.finale-word{position:absolute;z-index:2;left:7%;bottom:16%;font-size:clamp(30px,3.3vw,62px);letter-spacing:.16em;color:#f8e6c7;text-shadow:0 4px 22px #1a0905}
+.finale-satellite{background-size:100% 100%}
+.finale-memory{position:absolute;z-index:4;inset:0;background-size:cover;background-position:center;mix-blend-mode:screen;pointer-events:none;will-change:transform,opacity}
+.memory-xunwu{mask-image:radial-gradient(ellipse 42% 75% at 17% 52%,#000 2%,transparent 78%)}
+.memory-yanan{mask-image:radial-gradient(ellipse 35% 68% at 60% 48%,#000 2%,transparent 76%)}
+.finale-paper{z-index:8;inset:2% 8%;background-size:contain;mix-blend-mode:screen;pointer-events:none}
+.finale-hero{z-index:10;background-position:center}
+.finale-hero::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 45% 38% at 50% 46%,#29080370,transparent 76%);pointer-events:none}
+.finale-foreground{position:absolute;z-index:11;bottom:-1%;left:-2%;width:28%;height:18%;background-position:center;background-size:contain;background-repeat:no-repeat;filter:drop-shadow(0 12px 14px #210905b0);will-change:transform,opacity}
+.finale-final-title{position:absolute;z-index:12;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;text-shadow:0 3px 22px #270904,0 0 45px #3b0c05;transform:translateY(-3%)}
+.finale-title{margin:0;color:#fff1d3;font-weight:500;font-size:clamp(52px,6.3vw,116px);letter-spacing:.24em;line-height:1.25;padding-left:.24em}
+.finale-subtitle{margin:18px 0 0;color:#f4dfbc;font-size:clamp(20px,2.1vw,39px);letter-spacing:.24em;padding-left:.24em}
+.finale-themes{margin:26px 0 0;color:#edd0a2;font-size:clamp(17px,1.45vw,28px);letter-spacing:.15em}
+.finale-last{margin:20px 0 0;color:#f1dfc2;font-size:clamp(16px,1.3vw,25px);letter-spacing:.12em}
+.finale-controls{position:absolute;z-index:22;left:50%;bottom:4%;transform:translateX(-50%);display:flex;gap:28px;align-items:center;white-space:nowrap;font-family:system-ui,sans-serif}
+.finale-controls button{border:1px solid #f1d5aa70;background:#26120ba8;color:#f3e5d0;padding:9px 18px;font:14px system-ui,sans-serif;letter-spacing:.05em}
+.finale-controls button:hover,.finale-controls button:focus-visible{background:#672b20db;color:#fff3dc}
+@media(max-width:700px){.finale-word{left:7%;bottom:20%;font-size:30px}.finale-title{font-size:48px}.finale-subtitle{font-size:19px}.finale-themes{font-size:15px;letter-spacing:.06em}.finale-last{font-size:14px;letter-spacing:.02em}.finale-foreground{width:38%;height:15%}.finale-controls{bottom:4%;gap:12px}.finale-controls button{padding:8px 13px;font-size:12px}}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import ArchivePanel from './ArchivePanel';
 import DocumentReader from './DocumentReader';
+import Finale, { type FinaleHandle } from './Finale';
 import { atlas, scenes, type Scene, type ScenePhase } from './scenes';
 
 type AutoState = 'off' | 'playing' | 'paused';
@@ -26,6 +27,7 @@ export default function CinematicApp() {
   const map = useRef<HTMLDivElement>(null);
   const modern = useRef<HTMLDivElement>(null);
   const chapterCurtain = useRef<HTMLDivElement>(null);
+  const finale = useRef<FinaleHandle>(null);
   const action = useRef<gsap.core.Timeline | null>(null);
   const auto = useRef<gsap.core.Timeline | null>(null);
   const ambient = useRef<gsap.core.Tween[]>([]);
@@ -46,6 +48,8 @@ export default function CinematicApp() {
   const [interlude, setInterlude] = useState<'intro' | 'outro' | null>(null);
   const [tour, setTour] = useState(false);
   const [manualReading, setManualReading] = useState(false);
+  const [finaleState, setFinaleState] = useState<'playing' | 'paused' | 'finished'>('playing');
+  const [finaleKey, setFinaleKey] = useState(0);
   const scene = scenes[index];
   sceneRef.current = scene;
 
@@ -176,6 +180,11 @@ export default function CinematicApp() {
       .to(chapterCurtain.current, { scaleX: 0, transformOrigin: 'right', duration: 0.75, ease: 'power2.inOut' });
   }, [goPresent, resetVisuals, setPhase, stopAuto]);
 
+  const enterFinale = useCallback(() => {
+    setChaptersOpen(false); setFinaleState(pausedRef.current ? 'paused' : 'playing');
+    setFinaleKey(value => value + 1); setInterlude('outro');
+  }, []);
+
   const startTour = useCallback(() => {
     if (phaseRef.current === 'chapter-changing') return;
     auto.current?.kill(); action.current?.kill(); action.current = null;
@@ -192,10 +201,10 @@ export default function CinematicApp() {
         .addLabel(`present-${chapter}`, start + 13.4).call(goPresent, [], `present-${chapter}`);
       if (chapter < 2) timeline.addLabel(`next-${chapter}`, start + 34).call(() => changeChapter(chapter + 1, true), [], `next-${chapter}`);
     });
-    timeline.addLabel('终章', 114).call(() => setInterlude('outro'), [], '终章')
-      .addLabel('结束', 124).call(() => {}, [], '结束');
+    timeline.addLabel('终章', 114).call(enterFinale, [], '终章')
+      .addLabel('结束', 138).call(() => {}, [], '结束');
     auto.current = timeline;
-  }, [changeChapter, closeDocument, goPresent, openDocumentAction, resetVisuals, setAmbientPaused, setPhase]);
+  }, [changeChapter, closeDocument, enterFinale, goPresent, openDocumentAction, resetVisuals, setAmbientPaused, setPhase]);
 
   const takeOverReading = useCallback(() => {
     if (!auto.current || !tourRef.current) return;
@@ -252,7 +261,7 @@ export default function CinematicApp() {
     action.current?.kill(); action.current = null; resetVisuals();
     gsap.set(chapterCurtain.current, { scaleX: 0, autoAlpha: 0 });
     gsap.set(modern.current, { opacity: 1, clipPath: 'none' });
-    setPhase('present'); setInterlude('outro'); setChaptersOpen(false);
+    setPhase('present'); enterFinale();
     auto.current.seek('终章', true);
   };
   const exploreChapter = (next: number) => {
@@ -265,6 +274,30 @@ export default function CinematicApp() {
   const turnPage = (next: number) => {
     if (phaseRef.current !== 'reading') return;
     takeOverReading(); setPage(next);
+  };
+  const pauseFinale = () => {
+    if (finaleState === 'playing') {
+      finale.current?.pause(); if (tourRef.current) { auto.current?.pause(); setAutoState('paused'); }
+      setAmbientPaused(true); setFinaleState('paused');
+    } else if (finaleState === 'paused') {
+      finale.current?.resume(); if (tourRef.current) { auto.current?.resume(); setAutoState('playing'); }
+      setAmbientPaused(false); setFinaleState('playing');
+    }
+  };
+  const skipFinale = () => {
+    finale.current?.finish();
+    auto.current?.kill(); auto.current = null; tourRef.current = false; setTour(false); setAutoState('off');
+    setAmbientPaused(false); setFinaleState('finished');
+  };
+  const replayFinale = () => {
+    auto.current?.kill(); auto.current = null; tourRef.current = false; setTour(false); setAutoState('off');
+    setAmbientPaused(false); setFinaleState('playing'); setFinaleKey(value => value + 1);
+  };
+  const leaveFinale = () => {
+    auto.current?.kill(); auto.current = null; action.current?.kill(); action.current = null;
+    tourRef.current = false; setTour(false); setAutoState('off'); setAmbientPaused(false);
+    setManualReading(false); resumeAfterReading.current = false; resumeOnRoom.current = false;
+    setInterlude(null); setChaptersOpen(true);
   };
 
   useEffect(() => {
@@ -282,7 +315,7 @@ export default function CinematicApp() {
   const isReading = ['opening', 'reading', 'closing'].includes(phase);
   const isBusy = ['opening', 'closing', 'transitioning', 'chapter-changing'].includes(phase);
   const [x, y, w, h] = scene.bounds;
-  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-reading={manualReading ? 'manual' : 'normal'} data-mode={tour ? 'guided' : 'explore'} className={`experience exploration ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' ? 'is-paused' : ''}`} ref={root}>
+  return <main data-chapter={scene.id} data-phase={phase} data-tour={tour ? 'active' : 'off'} data-reading={manualReading ? 'manual' : 'normal'} data-mode={tour ? 'guided' : 'explore'} data-finale={interlude === 'outro' ? finaleState : 'off'} className={`experience exploration ${hidden ? 'ui-hidden' : ''} ${isReading ? 'is-reading' : ''} ${phase === 'transitioning' ? 'is-transitioning' : ''} ${interlude ? 'has-interlude' : ''} ${autoState !== 'off' ? 'auto-performance' : ''} ${autoState === 'paused' || finaleState === 'paused' && interlude === 'outro' ? 'is-paused' : ''}`} ref={root}>
     <div className="stage">
       <div className="camera" ref={camera}>
         <ParallaxScene scene={scene} />
@@ -318,17 +351,19 @@ export default function CinematicApp() {
 
     {phase === 'present' && <section className="present-caption ui"><div className="caption-mark" /><div><p>{scene.id === 'zunyi' ? '独立自主与开放合作，可以并行。' : scene.caseData.lead}</p></div></section>}
 
-    {interlude && <section className={`interlude ui interlude-${interlude}`}>
-      {interlude === 'intro' ? <><p>毛泽东思想活的灵魂</p><h2>思想常青</h2><div className="interlude-rule" /><div>从历史出发，回答今天的问题。</div></> : <><p>终章 · 思想何以常青</p><h2>回到现实，<br />继续寻找答案。</h2><div className="interlude-rule" /><div>尊重事实 · 依靠人民 · 掌握主动</div></>}
-    </section>}
+    {interlude === 'intro' && <section className="interlude ui interlude-intro"><p>毛泽东思想活的灵魂</p><h2>思想常青</h2><div className="interlude-rule" /><div>从历史出发，回答今天的问题。</div></section>}
+    {interlude === 'outro' && <Finale key={finaleKey} ref={finale} paused={finaleState === 'paused'} onComplete={() => setFinaleState('finished')} />}
 
-    <footer className="explore-controls ui" aria-label="场景操作">
+    {interlude === 'outro' ? <footer className="finale-controls" aria-label="终章操作">
+      {finaleState === 'finished' ? <><button onClick={replayFinale}>再次观看</button><button onClick={leaveFinale}>返回目录</button></> : <><button onClick={pauseFinale}>{finaleState === 'paused' ? '继续' : '暂停'}</button><button onClick={skipFinale}>跳过</button><button onClick={leaveFinale}>退出</button></>}
+    </footer> : <footer className="explore-controls ui" aria-label="场景操作">
       <div className="chapter-picker"><button aria-expanded={chaptersOpen} onClick={() => setChaptersOpen(!chaptersOpen)}>目录</button>{chaptersOpen && <nav className="chapter-menu" aria-label="目录">{scenes.map((item, i) => <button key={item.id} onClick={() => exploreChapter(i)}>{item.chapter} · {['寻乌调查', '延安', '遵义会议'][i]}</button>)}<button onClick={startTour}>自动导览</button><button onClick={showArchive}>参考文献与制作说明</button></nav>}</div>
       {autoState === 'off' ? <>
         {!isReading && <><button disabled={isBusy || (index === 0 && phase === 'room')} onClick={() => { setInterlude(null); if (phase === 'present') returnRoom(); else if (index > 0) changeChapter(index - 1, false, true); }}>上一场景</button><button disabled={isBusy || (index === 2 && phase === 'present')} onClick={() => { setInterlude(null); if (phase === 'room') goPresent(); else if (index < 2) changeChapter(index + 1); }}>下一场景</button></>}
+        {index === 2 && phase === 'present' && <button onClick={enterFinale}>进入终章</button>}
         <button onClick={startTour} disabled={phase === 'chapter-changing'}>自动导览</button>
       </> : <><button onClick={pause}>{autoState === 'playing' ? '暂停导览' : '继续导览'}</button><button onClick={skipChapter}>跳过本章</button><button onClick={stopAuto}>退出导览</button></>}
-    </footer>
+    </footer>}
     {hidden && <button className="restore-ui" onClick={() => setHidden(false)}>显示界面 <kbd>H</kbd></button>}
     {archive && <ArchivePanel scene={scene} close={() => setArchive(false)} />}
   </main>;

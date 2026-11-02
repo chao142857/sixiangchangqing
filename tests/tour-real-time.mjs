@@ -21,10 +21,11 @@ try {
     await page.waitForFunction(id => document.querySelector('main')?.dataset.chapter === id && document.querySelector('main')?.dataset.phase === 'present', chapter, { timeout: 25000 });
   }
   await page.waitForFunction(() => document.querySelector('main')?.dataset.tour === 'off', null, { timeout: 30000 });
-  assert(await page.locator('.interlude-outro').isVisible());
+  assert(await page.locator('.finale').isVisible());
+  assert(await page.getByRole('button', { name: '再次观看' }).isVisible());
   const seconds = (Date.now() - start) / 1000;
-  assert(seconds > 120 && seconds < 150);
+  assert(seconds > 135 && seconds < 150);
   assert.deepEqual(errors, []);
   await writeFile('output/exploration/实时导览测试结果.json', JSON.stringify({ seconds, chapters, errors }, null, 2));
-  console.log(`PASS: real-time browser tour ${seconds.toFixed(1)}s, all chapters retain full body text and page controls.`);
+  console.log(`PASS: real-time browser tour ${seconds.toFixed(1)}s, all chapters retain full body text and the finale remains on screen.`);
 } finally { await browser.close(); }

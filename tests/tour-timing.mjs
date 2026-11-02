@@ -18,8 +18,9 @@ try {
     const state = await page.locator('main').evaluate(element => ({ ...element.dataset }));
     assert.equal(state.chapter, chapter); assert.equal(state.phase, phase);
   }
-  await page.clock.runFor(12000);
-  assert(await page.locator('.interlude-outro').isVisible());
-  assert(await page.getByRole('button', { name: '自动导览', exact: true }).isVisible());
-  console.log('PASS: virtual-clock timeline 124s, all three chapter/case pairs and ending');
+  await page.clock.runFor(26000);
+  assert(await page.locator('.finale').isVisible());
+  assert(await page.getByRole('button', { name: '再次观看' }).isVisible());
+  assert(await page.getByRole('button', { name: '返回目录' }).isVisible());
+  console.log('PASS: virtual-clock timeline 138s, all three chapter/case pairs and ending');
 } finally { await browser.close(); }
