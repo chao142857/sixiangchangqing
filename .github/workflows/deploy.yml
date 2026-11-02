@@ -1,4 +1,4 @@
-name: Deploy exhibition to GitHub Pages
+name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
@@ -19,9 +19,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
       - run: npm ci
-      - run: npm run build
-      - uses: actions/configure-pages@v5
+      - run: npm run lint
+      - name: Build for the Pages repository path
+        run: npm run build
+        env:
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
